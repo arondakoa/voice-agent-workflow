@@ -189,7 +189,7 @@ class InsuranceAgent(Agent):
         """Save the damage description. This triggers AI damage analysis in the background."""
         logger.info(f"[TOOL CALLED] save_damage_description(damage={damage})")
         await self._update_session("damage", damage)
-        return f"Damage description recorded. Analysis started."
+        return "Damage description recorded. Analysis started."
 
     @function_tool()
     async def save_zip_code(self, zip_code: str) -> str:

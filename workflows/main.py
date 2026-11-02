@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 from openai import OpenAI
-from render_sdk import Workflows, Retry
+from render_sdk import Workflows
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ async def fraud_check(claim_id: str) -> dict:
         "risk_score": 0.12,
         "passed": True,
     }
-    logger.info(f"fraud_check DONE  risk=low")
+    logger.info("fraud_check DONE  risk=low")
     return result
 
 

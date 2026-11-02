@@ -44,7 +44,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-openai_client = AsyncOpenAI()
+# Lazy: ohne OPENAI_API_KEY startet die API trotzdem (Claims, Sessions, Health);
+# nur Sprach-Ein-/Ausgabe meldet dann einen klaren Fehler.
+_openai_client: Optional[AsyncOpenAI] = None
+
+
+def get_openai_client() -> AsyncOpenAI:
+    global _openai_client
+    if _openai_client is None:
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise RuntimeError("OPENAI_API_KEY nicht gesetzt - Sprachfunktionen deaktiviert.")
+        _openai_client = AsyncOpenAI()
+    return _openai_client
 
 # In-memory storage (would use PostgreSQL in production)
 claims_db: dict = {}
@@ -274,7 +285,7 @@ async def _ws_send(ws: WebSocket, msg: dict):
 
 async def speech_to_text(audio_bytes: bytes) -> str:
     logger.info(f"[STT] Processing {len(audio_bytes)} bytes")
-    transcription = await openai_client.audio.transcriptions.create(
+    transcription = await get_openai_client().audio.transcriptions.create(
         file=("audio.webm", audio_bytes, "audio/webm"),
         model="whisper-1",
         language="en",
@@ -285,7 +296,7 @@ async def speech_to_text(audio_bytes: bytes) -> str:
 
 async def text_to_speech(text: str) -> bytes:
     logger.info(f"[TTS] Generating speech for: {text[:60]!r}…")
-    response = await openai_client.audio.speech.create(
+    response = await get_openai_client().audio.speech.create(
         model="tts-1",
         voice="marin",
         input=text,
@@ -618,6 +629,14 @@ async def create_claim(request: ClaimCreate):
     return {"claim_id": claim_id, "status": "processing"}
 
 
+# Muss VOR /api/claims/{claim_id} stehen, sonst matcht "latest" als claim_id.
+@app.get("/api/claims/latest")
+async def get_latest_claim():
+    if not claims_db:
+        raise HTTPException(status_code=404, detail="No claims found")
+    return max(claims_db.values(), key=lambda c: c["created_at"])
+
+
 @app.get("/api/claims/{claim_id}")
 async def get_claim(claim_id: str):
     if claim_id not in claims_db:
@@ -670,13 +689,6 @@ async def update_step(claim_id: str, step_name: str, status: str, result: dict =
             claim["status"] = "completed"
 
     return {"status": "updated"}
-
-
-@app.get("/api/claims/latest")
-async def get_latest_claim():
-    if not claims_db:
-        raise HTTPException(status_code=404, detail="No claims found")
-    return max(claims_db.values(), key=lambda c: c["created_at"])
 
 
 # ============================================================================

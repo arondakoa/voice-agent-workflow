@@ -7,3 +7,6 @@ __pycache__
 .env.test.local
 .env.production.local
 dist
+.DS_Store
+*.tsbuildinfo
+.pytest_cache/
